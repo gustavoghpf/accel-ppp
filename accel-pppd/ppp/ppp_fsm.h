@@ -1,6 +1,11 @@
 #ifndef PPP_FSM_H
 #define PPP_FSM_H
 
+#include <stdint.h>
+
+#include "ppp.h"
+#include "triton.h"
+
 typedef enum {FSM_Initial=0,FSM_Starting,FSM_Closed,FSM_Stopped,FSM_Closing,FSM_Stopping,FSM_Req_Sent,FSM_Ack_Rcvd,FSM_Ack_Sent,FSM_Opened} FSM_STATE;
 /*
  *  CP (LCP, IPCP, etc.) codes.
@@ -18,8 +23,6 @@ typedef enum {FSM_Initial=0,FSM_Starting,FSM_Closed,FSM_Stopped,FSM_Closing,FSM_
 #define DISCARDREQ	11	/* Discard Request */
 #define	IDENT		  12	/* Identification */
 
-struct ppp_t;
-
 struct ppp_fsm_t
 {
 	struct ppp_t *ppp;
@@ -33,8 +36,8 @@ struct ppp_fsm_t
 	int max_failure;
 	int conf_failure;
 
-	int id;
-	int recv_id;
+	uint8_t id;
+	uint8_t recv_id;
 
 	//fsm handling
 	void (*layer_up)(struct ppp_fsm_t*);

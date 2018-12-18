@@ -379,6 +379,11 @@ early_out:
 	goto out;
 }
 
+static void print_netns(struct ap_session *ses, char *buf)
+{
+	snprintf(buf, CELL_SIZE, "%s", ses->net->name);
+}
+
 static void print_ifname(struct ap_session *ses, char *buf)
 {
 	snprintf(buf, CELL_SIZE, "%s", ses->ifname);
@@ -419,7 +424,7 @@ static void print_ip6(struct ap_session *ses, char *buf)
 	struct in6_addr addr;
 	char *ptr;
 
-	if (!ses->ipv6) {
+	if (!ses->ipv6 || list_empty(&ses->ipv6->addr_list)) {
 		*buf = 0;
 		return;
 	}
@@ -638,6 +643,7 @@ static void init(void)
 
 	cli_register_simple_cmd2(show_ses_exec, show_ses_help, 2, "show", "sessions");
 
+	cli_show_ses_register("netns", "network namespace name", print_netns);
 	cli_show_ses_register("ifname", "interface name", print_ifname);
 	cli_show_ses_register("username", "user name", print_username);
 	cli_show_ses_register("origin", "origin", print_ifname_origin);

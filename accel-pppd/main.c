@@ -43,8 +43,6 @@ static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 
 #ifdef CRYPTO_OPENSSL
-#include <openssl/ssl.h>
-
 static pthread_mutex_t *ssl_lock_cs;
 
 static unsigned long ssl_thread_id(void)
@@ -243,6 +241,7 @@ int main(int _argc, char **_argv)
 	int pagesize = sysconf(_SC_PAGE_SIZE);
 	int internal = 0;
 	int no_sigint = 0;
+	int no_sigsegv = 0;
 
 	argc = _argc;
 	argv = _argv;
@@ -270,6 +269,8 @@ int main(int _argc, char **_argv)
 			mprotect(conf_dump, len, PROT_READ);
 		} else if (!strcmp(argv[i], "--internal"))
 			internal = 1;
+		else if (!strcmp(argv[i], "--no-sigsegv"))
+			no_sigsegv = 1;
 		else if (!strcmp(argv[i], "--no-sigint"))
 			no_sigint = 1;
 	}
@@ -281,6 +282,8 @@ int main(int _argc, char **_argv)
 		while (getppid() != 1)
 			sleep(1);
 	}
+
+	srandom(time(NULL));
 
 	if (triton_init(conf_file))
 		_exit(EXIT_FAILURE);
@@ -334,9 +337,11 @@ int main(int _argc, char **_argv)
 	sa.sa_mask = set;
 	sigaction(SIGUSR1, &sa, NULL);
 
-	sa.sa_handler = sigsegv;
-	sa.sa_mask = set;
-	sigaction(SIGSEGV, &sa, NULL);
+	if (!no_sigsegv) {
+		sa.sa_handler = sigsegv;
+		sa.sa_mask = set;
+		sigaction(SIGSEGV, &sa, NULL);
+	}
 
 
 	sigdelset(&set, SIGKILL);
@@ -356,10 +361,6 @@ int main(int _argc, char **_argv)
 
 	sigemptyset(&set);
 	sigaddset(&set, SIGTERM);
-	sigaddset(&set, SIGSEGV);
-	sigaddset(&set, SIGILL);
-	sigaddset(&set, SIGFPE);
-	sigaddset(&set, SIGBUS);
 	if (!no_sigint)
 		sigaddset(&set, SIGINT);
 
