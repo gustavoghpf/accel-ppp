@@ -53,9 +53,13 @@ static void arp_ctx_read(struct _arphdr *ah)
 	struct ipoe_serv *ipoe = container_of(triton_context_self(), typeof(*ipoe), ctx);
 	struct sockaddr_ll dst;
 
+	if (ah->ar_spa == ah->ar_tpa)
+		goto out;
+
 	memset(&dst, 0, sizeof(dst));
 	dst.sll_family = AF_PACKET;
 	dst.sll_ifindex = ipoe->ifindex;
+	dst.sll_halen = ETH_ALEN;
 	dst.sll_protocol = htons(ETH_P_ARP);
 
 	ah2.ar_hrd = htons(ARPHRD_ETHER);
@@ -101,7 +105,7 @@ static void arp_ctx_read(struct _arphdr *ah)
 	}
 
 	if (ses2) {
-		if (ipoe->opt_arp == 1 || ses1 == ses2) {
+		if (ipoe->opt_arp == 1) {
 			pthread_mutex_unlock(&ipoe->lock);
 			goto out;
 		}
@@ -133,6 +137,7 @@ void arp_send(int ifindex, struct _arphdr *arph, int broadcast)
 	memset(&dst, 0, sizeof(dst));
 	dst.sll_family = AF_PACKET;
 	dst.sll_ifindex = ifindex;
+	dst.sll_halen = ETH_ALEN;
 	dst.sll_protocol = htons(ETH_P_ARP);
 	if (broadcast)
 		memcpy(dst.sll_addr, bc_addr, ETH_ALEN);
