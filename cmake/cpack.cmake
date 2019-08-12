@@ -1,8 +1,8 @@
 INCLUDE(InstallRequiredSystemLibraries)
 
 SET(CPACK_PACKAGE_VERSION_MAJOR "1")
-SET(CPACK_PACKAGE_VERSION_MINOR "11")
-SET(CPACK_PACKAGE_VERSION_PATCH "99")
+SET(CPACK_PACKAGE_VERSION_MINOR "12")
+SET(CPACK_PACKAGE_VERSION_PATCH "0")
 
 SET(CPACK_PACKAGE_NAME "accel-ppp")
 SET(CPACK_PACKAGE_CONTACT "Dmitry Kozlov <xeb@mail.ru>")
@@ -37,14 +37,19 @@ IF(CPACK_TYPE STREQUAL Debian9)
 	INCLUDE(${CMAKE_HOME_DIRECTORY}/cmake/debian/debian.cmake)
 ENDIF(CPACK_TYPE STREQUAL Debian9)
 
+IF(CPACK_TYPE STREQUAL Debian10)
+	SET(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.28), libssl1.1 (>= 1.1.1c), libpcre3 (>= 8.39)")
+	INCLUDE(${CMAKE_HOME_DIRECTORY}/cmake/debian/debian.cmake)
+ENDIF(CPACK_TYPE STREQUAL Debian10)
+
 IF(CPACK_TYPE STREQUAL Ubuntu16)
-        SET(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.24), libssl1.0.0 (>= 1.0.2t), libpcre3 (>= 8.39)")
-        INCLUDE(${CMAKE_HOME_DIRECTORY}/cmake/debian/debian.cmake)
+	SET(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.24), libssl1.0.0 (>= 1.0.2t), libpcre3 (>= 8.39)")
+	INCLUDE(${CMAKE_HOME_DIRECTORY}/cmake/debian/debian.cmake)
 ENDIF(CPACK_TYPE STREQUAL Ubuntu16)
 
 IF(CPACK_TYPE STREQUAL Ubuntu18)
-        SET(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.24), libssl1.0.0 (>= 1.0.2n), libpcre3 (>= 8.39)")
-        INCLUDE(${CMAKE_HOME_DIRECTORY}/cmake/debian/debian.cmake)
+	SET(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.24), libssl1.0.0 (>= 1.0.2n), libpcre3 (>= 8.39)")
+	INCLUDE(${CMAKE_HOME_DIRECTORY}/cmake/debian/debian.cmake)
 ENDIF(CPACK_TYPE STREQUAL Ubuntu18)
 
 IF(CPACK_TYPE STREQUAL Centos7)

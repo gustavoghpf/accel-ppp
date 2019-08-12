@@ -23,10 +23,13 @@ name3
 .br
 .SH SECTIONS
 .SH [modules]
-containes list of modules to load
+contains list of modules to load
 .TP
 .BI log_file
 This is logging target which logs messages to files. It support per-session/per-user features.
+.TP
+.BI log_syslog
+This is logging target which logs messages to syslog.
 .TP
 .BI log_tcp
 This is logging target which logs messages over TCP/IP.
@@ -75,6 +78,9 @@ Helper module to manage child processes, required by pppd_compat
 .TP
 .BI pppd_compat
 This module starts pppd compatible ip-up/ip-down scripts and ip-change to handle RADIUS CoA request.
+.TP
+.BI connlimit
+This module limits connection rate from single source.
 .SH [core]
 Configuration of core module
 .TP
@@ -83,6 +89,39 @@ Path to file for core module error logging.
 .TP
 .BI "thread-count=" n
 number of working threads, optimal - number of processors/cores
+.SH [common]
+Contains common params for all connection types
+.TP
+.BI "single-session=" replace|deny
+Specifies whether accel-ppp should control sessions count.
+.br
+If this option is absent session count control is turned off.
+.br
+If this option is 
+.B replace
+then accel-ppp will terminate first session when second is authorized.
+.br
+If this option is 
+.B deny
+then accel-ppp will deny second session authorization.
+.TP
+.BI "sid-case=" upper|lower
+Specifies in which case generate session identifier (default lower).
+.TP
+.BI "sid-source=" urandom|seq
+Specifies method assign session id (default urandom).
+.br
+.B urandom
+Assign session id by random method
+.br
+.B seq
+Assign session id by sequence method
+.TP
+.BI "seq-file=" path
+Path to file for sessions sequence number. Start sequence number may be set there (default /var/lib/accel-ppp/seq).
+.TP
+.BI "max-sessions=" n
+Specifies maximum sessions which server may processed (default 0, disabled)
 .SH [ppp]
 .br
 PPP module configuration.
@@ -120,25 +159,11 @@ Protocol field compression negotiation.
 .BI "ccp=" n
 Disable CCP negotiation if this parameter is zero.
 .TP
-.BI "sid-case=" upper|lower
-Specifies in which case generate session identifier (default lower).
-.TP
 .BI "check-ip=" 0|1
 Specifies whether accel-ppp should check if IP already assigned to other ppp interface (default 0).
 .TP
-.BI "single-session=" replace|deny
-Specifies whether accel-ppp should control sessions count.
-.br
-If this option is absent session count control is turned off.
-If this option is 
-.B replace
-then accel-ppp will terminate first session when second is authorized.
-If this option is 
-.B deny
-then accel-ppp will deny second session authorization.
-.TP
 .BI "mppe=" require|prefer|deny
-Specifies mppe negotioation preference.
+Specifies mppe negotiation preference.
 .br
 .B require
 - ask client for mppe, if it rejects drop connection
@@ -153,7 +178,7 @@ Default behavior - don't ask client for mppe, but allow it if client wants.
 Please note that RADIUS may override this option by MS-MPPE-Encryption-Policy attribute.
 .TP
 .BI "ipv4=" deny|allow|prefer|require
-Specify IPv4 (IPCP) negotioation algorithm:
+Specify IPv4 (IPCP) negotiation algorithm:
 .br
 .B deny
 - don't negotiate IPv4.
@@ -186,7 +211,7 @@ Specify peer interface identifier for IPv6.
 Specify whether to accept peer's interface identifier.
 .TP
 .BI "lcp-echo-interval=" n
-If this option is given and greater then 0 then lcp module will send echo-request every 
+If this option is given and greater than 0 then lcp module will send echo-request every 
 .B n
 seconds.
 .TP
@@ -197,7 +222,7 @@ Specifies maximum number of echo-requests may be sent without valid echo-reply, 
 Specifies timeout in seconds to wait for any peer activity. If this option specified it turns on adaptive lcp echo functionality and "lcp-echo-failure" is not used.
 .TP
 .BI "unit-cache=" n
-Specifies number of interfaces to keep in cache. It means that don't destory interface after corresponding session is destoyed, instead place it to cache and use it later for new sessions repeatedly.
+Specifies number of interfaces to keep in cache. It means that don't destroy interface after corresponding session is destroyed, instead place it to cache and use it later for new sessions repeatedly.
 This should reduce kernel-level interface creation/deletion rate lack.
 .TP
 .BI "unit-preallocate=" 0|1
@@ -238,6 +263,12 @@ then password will be same as Calling-Station-Id.
 Or you can specify fixed password in
 .B <string>.
 .TP
+.BI "session-timeout=" n
+Specifies max sessions time in seconds. After this time session will be terminated. May redefine with radius attribute Session-Timeout
+.TP
+.BI "idle-timeout=" n
+Specifies timeout in seconds to wait for any packets from client, after this time session will terminated if client don`t send any packet. Often used with mode=L3.
+.TP
 .BI "lease-time=" n
 Specifies lease time in seconds to be sent to dhcp client.
 .TP
@@ -248,7 +279,7 @@ Specifies lease renew time (option 58) in seconds to be sent to dhcp client.
 Specifies max lease time in seconds, after this time session will be terminated if client won't renew it.
 .TP
 .BI "unit-cache=" n
-Specifies number of interfaces to keep in cache. It means that don't destory interface after corresponding session is destoyed, instead place it to cache and use it later for new sessions repeatedly.
+Specifies number of interfaces to keep in cache. It means that don't destroy interface after corresponding session is destroyed, instead place it to cache and use it later for new sessions repeatedly.
 This should reduce kernel-level interface creation/deletion rate lack.
 .TP
 .BI "l4-redirect-table=" n
@@ -351,7 +382,7 @@ The
 .B start
 parameter specifies which way session starts (up - unclassified packet).
 .br
-auto - means automatically start session with username = interface name. Use it with conjuction vlan_mon.
+auto - means automatically start session with username = interface name. Use it with conjunction vlan_mon.
 .br
 The
 .B range
@@ -390,6 +421,9 @@ Specifies delays (also in condition of connection count) to send DHCPOFFER (ms).
 Last delay in list may be -1 which means don't accept new connections.
 List must to be sorted by count key.
 .TP
+.BI "offer-timeout=" n
+Specified timeout waiting DHCP-Request from client in seconds (default 10).
+.TP
 .BI "vlan-mon=" [re:]name[,filter]
 Starts vlan monitor on specified interface (requires ipoe kernel module).
 .br
@@ -406,7 +440,7 @@ Specifies time of vlan inactivity before it will be removed (seconds).
 Specifies pattern of vlan interface name. Pattern may contain following macros:
 .br
 .B %I
-- name of patern interface.
+- name of pattern interface.
 .br
 .B %N
 - number of vlan.
@@ -438,7 +472,7 @@ Specifies primary NBNS to be sent to peer.
 .TP
 .BI "wins2=" x.x.x.x
 Specifies secondary NBNS to be sent to peer.
-.SH [dnsv6]
+.SH [ipv6-dns]
 .TP
 .BI "dns=" IPv6_address
 Specifies IPv6 DNS to be sent to peer. You may specify up to 3 dns options.
@@ -469,7 +503,7 @@ If this option is given and
 is greater of zero then pptp module will produce verbose logging.
 .TP
 .BI "echo-interval=" n
-If this option is given and greater then zero then pptp module will send echo-request every 
+If this option is given and greater than zero then pptp module will send echo-request every 
 .B n
 seconds.
 .TP
@@ -487,7 +521,7 @@ If this option is given ppp interface will be renamed using
 as a template, i.e pptp%d => pptp0.
 .TP
 .BI "ppp-max-mtu=" n
-Set the maximun MTU value that can be negociated for PPP over PPTP
+Set the maximum MTU value that can be negotiated for PPP over PPTP
 sessions. Default value is 1436.
 .SH [pppoe]
 .br
@@ -638,7 +672,7 @@ port of the incoming request (SCCRQ) is used as source port for the
 reply (SCCRP). Default value is 0.
 .TP
 .BI "ppp-max-mtu=" n
-Set the maximun MTU value that can be negociated for PPP over L2TP
+Set the maximum MTU value that can be negotiated for PPP over L2TP
 sessions. Default value is 1420.
 .TP
 .BI "ifname=" ifname
@@ -667,7 +701,7 @@ Timeout waiting reply from client in seconds.
 Default is 60.
 .TP
 .BI "hello-interval=" n
-If this option is given and greater then zero then sstp will send echo-request every 
+If this option is given and greater than zero then sstp will send echo-request every 
 .B n
 seconds and drop connection without a reply.
 Default is 60.
@@ -746,7 +780,7 @@ If this option is given ppp interface will be renamed using
 as a template, i.e sstp%d => sstp0.
 .TP
 .BI "ppp-max-mtu=" n
-Set the maximun MTU value that can be negociated for PPP over SSTP sessions.
+Set the maximum MTU value that can be negotiated for PPP over SSTP sessions.
 Default value is 1452, maximum is 4087.
 .SH [radius]
 .br
@@ -828,6 +862,9 @@ Specifies whether radius client should send Account-Request with Acct-Status-Typ
 .TP
 .BI "attr-tunnel-type=" name
 Specifies custom attribute name to be used to send tunnel type (as string).
+.TP
+.BI "sid-in-auth=0|1"
+Specifies should accel-ppp generate and send Acct-Session-Id on Access-Request packet.
 .SH [log]
 .br
 Configuration of log and log_file modules.
@@ -849,7 +886,7 @@ Send logs to system logger.
 Facility may be: daemon, local0-local7 or numeric value.
 .TP
 .BI "copy=" n
-If this options is given and greater then zero logging engine will duplicate session log in general log.
+If this options is given and greater than zero logging engine will duplicate session log in general log.
 (Useful when per-session/per-user logs are not used)
 .TP
 .BI "per-session-dir=" dir
@@ -859,7 +896,7 @@ Directory for session logs. If specified each session will be logged separately 
 Directory for user logs. If specified all sessions of same user will be logged to file which name is user name.
 .TP
 .BI "per-session=" n
-If specified and n is greater then zero each session of same user will be logger separately to directory specified by "per-user-dir" 
+If specified and n is greater than zero each session of same user will be logger separately to directory specified by "per-user-dir" 
 and subdirectory which name is user name and to file which name os unique session identifier.
 .TP
 .BI "level=" n
@@ -875,10 +912,10 @@ log only error messages
 log error and warning messages
 .br
 .B 3
-log error, warning and minimum information messages (use this level in conjuction with verbose option of other modules if you need verbose logging)
+log error, warning and minimum information messages (use this level in conjunction with verbose option of other modules if you need verbose logging)
 .br
 .B 4
-log error, warning and full information messages (use this level in conjuction with verbose option of other modules if you need verbose logging)
+log error, warning and full information messages (use this level in conjunction with verbose option of other modules if you need verbose logging)
 .br
 .B 5
 log all messages including debug messages
@@ -911,7 +948,7 @@ Configuration of pppd_compat module.
 Path to ip-pre-up script which is executed before ppp interface comes up, useful to setup firewall rules before any traffic can pass through the interface.
 .TP
 .BI "ip-up=" file
-Path to ip-up script which is executed when ppp interfaces is completly configured and started.
+Path to ip-up script which is executed when ppp interfaces is completely configured and started.
 .TP
 .BI "ip-down=" file
 Path to ip-down script which is executed when session is about to terminate.
@@ -923,7 +960,7 @@ Path to ip-change script which is executed for RADIUS CoA handling.
 Prefix of radattr files (for example /var/run/radattr, resulting files will be /var/run/radattr.pppX)
 .TP
 .BI "verbose=" n
-If specified and greated then zero pppd_module will produce verbose logging.
+If specified and greater than zero pppd_module will produce verbose logging.
 .SH [chap-secrets]
 .br
 Configuration of chap-secrets module.
@@ -972,7 +1009,7 @@ Specifies range of remote address of ppp interfaces if form:
 Also specifies range of remote address of ppp interfaces.
 .TP
 .BI "attr=" attribute
-Specifies which Radius attribute containes pool name.
+Specifies which Radius attribute contains pool name.
 .TP
 .BI "vendor=" vendor
 If attribute is vendor-specific then specify vendor name in this option.
@@ -1032,7 +1069,7 @@ Burst will be calculated as rate multyply burst-factor.
 Specifies burst factor for upstream and downstream respectively.
 .TP
 .BI "latency=" n
-Specifies latency (in miliseconds) parameter of tbf qdisc.
+Specifies latency (in milliseconds) parameter of tbf qdisc.
 .TP
 .BI "mpu=" n
 Specifies mpu parameter of tbf qdisc and policer.
@@ -1047,7 +1084,7 @@ Specifies quantum parameter of htb classes.
 If fixed quantum is not specified and this option is specified then shaper module will check for quantum value is valid (in range 1000-200000).
 .TP
 .BI "fwmark=" n
-Spicifies the fwmark for traffic that won't be passed through shaper.
+Specifies the fwmark for traffic that won't be passed through shaper.
 .TP
 .BI "up-limiter=" police|htb
 Specifes upstream rate limiting method.
@@ -1056,7 +1093,7 @@ Specifes upstream rate limiting method.
 Specifies downstream rate limiting method.
 .TP
 .BI "leaf-qdisc=" "qdisc parameters"
-In case if htb is used as up-limiter or down-limiter specified leaf qdisc can be attached automaticaly.
+In case if htb is used as up-limiter or down-limiter specified leaf qdisc can be attached automatically.
 At present sfq and fq_codel qdiscs are implemented. Parameters are same as for tc:
 .br
 sfq [ limit NUMBER ] [ perturn SECS ] [ quantum BYTES ]
