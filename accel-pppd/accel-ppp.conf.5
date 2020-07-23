@@ -105,6 +105,9 @@ If this option is
 .B deny
 then accel-ppp will deny second session authorization.
 .TP
+.BI "single-session-ignore-case=" 0|1
+Specifies whether accel-ppp should ignore the case when comparing username within single-session validation (default 0).
+.TP
 .BI "sid-case=" upper|lower
 Specifies in which case generate session identifier (default lower).
 .TP
@@ -121,7 +124,13 @@ Assign session id by sequence method
 Path to file for sessions sequence number. Start sequence number may be set there (default /var/lib/accel-ppp/seq).
 .TP
 .BI "max-sessions=" n
-Specifies maximum sessions which server may processed (default 0, disabled)
+Specifies maximum concurrent sessions which server may processed (default 0, disabled)
+.TP
+.BI "max-starting=" n
+Specifies maximum concurrent session attempts which server may processed (default 0, disabled)
+.TP
+.BI "check-ip=" 0|1
+Specifies whether accel-ppp should check if IP already assigned to other client interface (default 0).
 .SH [ppp]
 .br
 PPP module configuration.
@@ -158,9 +167,6 @@ Protocol field compression negotiation.
 .TP
 .BI "ccp=" n
 Disable CCP negotiation if this parameter is zero.
-.TP
-.BI "check-ip=" 0|1
-Specifies whether accel-ppp should check if IP already assigned to other ppp interface (default 0).
 .TP
 .BI "mppe=" require|prefer|deny
 Specifies mppe negotiation preference.
@@ -715,6 +721,9 @@ Specifies incoming connection acceptance mode.
 .B proxy
 - enable PROXY protocol 1 & 2 support.
 .TP
+.BI "ssl-protocol=" ssl2|ssl3|tls1|tls1.1|tls1.2|tls1.3
+Specifies the enabled SSL/TLS protocols supported by OpenSSL library.
+.TP
 .BI "ssl-dhparam=" pemfile
 Specifies a file with DH parameters for DHE ciphers.
 .TP
@@ -831,6 +840,9 @@ Specifies secret to use in DM/CoA communication.
 .TP
 .BI "acct-interim-interval=" n
 Specifies interval in seconds to send accounting information (may be overriden by radius Acct-Interim-Interval attribute)
+.TP
+.BI "acct-interim-jitter=" n
+Specifies absolute maximum jitter value in seconds to be applied to accounting information interval.
 .TP
 .BI "verbose=" n
 If this option is given and 
@@ -1016,27 +1028,34 @@ If attribute is vendor-specific then specify vendor name in this option.
 .SH [ipv6-pool]
 .br
 Configuration of ipv6pool module.
+.TP
+.BI ipv6prefix/mask,prefix_len[,name=pool_name][,next=next_pool_name]
 .br
-Format of each row is
-.br
-.B ipv6prefix/mask,prefix_len
-for example:
-.br
-.B fc00:0:1::/48,64
-- specifies pool of address by dividing prefix fc00:0:1::/48 to networks with 64 prefix len, e.g:
+.B fc00:0:1::/48,64 - specifies pool of address by dividing prefix fc00:0:1::/48 to networks with 64 prefix len, e.g:
 .br
 fc00:0:1:0::/64
 .br
 fc00:0:1:1::/64
 .br
-...
+ ...
+.br
 fc00:0:1:ffff::/64
 .TP
-.BI "delegate=" ipv6prefix/mask,prefix_len
+.BI "delegate=" ipv6prefix/mask,prefix_len[,name=pool_name][,next=next_pool_name]
 Specifies range of prefixes to delegate to clients through DHCPv6 prefix delegation (rfc3633).
 Format is same as described above.
+.TP
 .BI "gw-ip6-address=" ipv6address
 Specifies gateway address (used only for /128 prefixes)
+.TP
+.BI "attr-prefix=" attribute
+Specifies which Radius attribute contains delegated prefix pool name.
+.TP
+.BI "attr-address=" attribute
+Specifies which Radius attribute contains stateful address pool name.
+.TP
+.BI "vendor=" vendor
+If attribute is vendor-specific then specify vendor name in this option.
 .SH [connlimit]
 .br
 This module limits connection rate from single source.
@@ -1102,6 +1121,9 @@ fq_codel [ limit PACKETS ] [flows NUMBER ] [ target TIME ] [ interval TIME ] [qu
 .TP
 .BI "rate-multiplier=" n
 Due to accel-ppp operates with rates in kilobit basis if you send rates in different basis then you can use this option to bring your values to kilobits.
+.TP
+.BI "rate-limit=" download_speed/upload_speed
+Specifies, should accel-ppp set default rate-limit for clients. Clients rate-limit will be overwritten by RADIUS filter attributes or chap-secrets rate-limit params.
 .SH [cli]
 .br
 Configuration of the command line interface.

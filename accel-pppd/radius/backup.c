@@ -22,6 +22,7 @@
 #define RAD_TAG_ACCT_SERVER_ADDR            9
 #define RAD_TAG_ACCT_SERVER_PORT           10
 #define RAD_TAG_IDLE_TIMEOUT               11
+#define RAD_TAG_ACCT_USERNAME              12
 
 
 #define add_tag(id, data, size) if (!backup_add_tag(m, id, 0, data, size)) return -1;
@@ -43,6 +44,7 @@ static int session_save(struct ap_session *ses, struct backup_mod *m)
 	idle_timeout = rpd->idle_timeout.period / 1000;
 
 	add_tag(RAD_TAG_INTERIM_INTERVAL, &rpd->acct_interim_interval, 4);
+	add_tag(RAD_TAG_INTERIM_JITTER, &rpd->acct_interim_jitter, 4);
 
 	if (rpd->session_timeout.tpd)
 		add_tag(RAD_TAG_SESSION_TIMEOUT, &session_timeout, 8);
@@ -67,6 +69,9 @@ static int session_save(struct ap_session *ses, struct backup_mod *m)
 		add_tag(RAD_TAG_ATTR_CLASS, rpd->attr_state, rpd->attr_state_len);
 
 	add_tag(RAD_TAG_TERMINATION_ACTION, &rpd->termination_action, 4);
+
+	if (rpd->acct_username)
+		add_tag(RAD_TAG_ACCT_USERNAME, rpd->acct_username, strlen(rpd->acct_username));
 
 	if (rpd->acct_req) {
 		add_tag(RAD_TAG_ACCT_SERVER_ADDR, &rpd->acct_req->server_addr, 4);
@@ -118,6 +123,9 @@ void radius_restore_session(struct ap_session *ses, struct radius_pd_t *rpd)
 			case RAD_TAG_INTERIM_INTERVAL:
 				rpd->acct_interim_interval = *(uint32_t *)tag->data;
 				break;
+			case RAD_TAG_INTERIM_JITTER:
+				rpd->acct_interim_jitter = *(uint32_t *)tag->data;
+				break;
 			case RAD_TAG_SESSION_TIMEOUT:
 				rpd->session_timeout.expire_tv.tv_sec = *(uint64_t *)tag->data - ses->start_time;
 				break;
@@ -143,6 +151,9 @@ void radius_restore_session(struct ap_session *ses, struct radius_pd_t *rpd)
 				break;
 			case RAD_TAG_TERMINATION_ACTION:
 				rpd->termination_action = *(uint32_t *)tag->data;
+				break;
+			case RAD_TAG_ACCT_USERNAME:
+				rpd->acct_username = _strndup(tag->data, tag->size);
 				break;
 			case RAD_TAG_ACCT_SERVER_ADDR:
 				acct_addr = *(in_addr_t *)tag->data;

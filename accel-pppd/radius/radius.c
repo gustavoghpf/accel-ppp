@@ -41,6 +41,7 @@ char *conf_dm_coa_secret;
 int conf_sid_in_auth;
 int conf_require_nas_ident;
 int conf_acct_interim_interval;
+int conf_acct_interim_jitter;
 
 int conf_accounting;
 int conf_fail_time;
@@ -277,6 +278,7 @@ int rad_proc_attrs(struct rad_req_t *req)
 	struct radius_pd_t *rpd = req->rpd;
 
 	req->rpd->acct_interim_interval = conf_acct_interim_interval;
+	req->rpd->acct_interim_jitter = conf_acct_interim_jitter;
 
 	list_for_each_entry(attr, &req->reply->attrs, entry) {
 		if (attr->vendor && attr->vendor->id == Vendor_Microsoft) {
@@ -303,10 +305,18 @@ int rad_proc_attrs(struct rad_req_t *req)
 			continue;
 
 		switch(attr->attr->id) {
+			case User_Name:
+				if (rpd->acct_username)
+					_free(rpd->acct_username);
+				if (attr->len)
+					rpd->acct_username = _strndup(attr->val.string, attr->len);
+				else if (rpd->acct_username)
+					rpd->acct_username = NULL;
+				break;
 			case Framed_IP_Address:
 				if (!conf_gw_ip_address && rpd->ses->ctrl->ppp)
 					log_ppp_warn("radius: gw-ip-address not specified, cann't assign IP address...\n");
-				else if (attr->val.ipaddr != 0xfffffffe) {
+				else if (attr->val.ipaddr != htonl(0xfffffffe)) {
 					rpd->ipv4_addr.owner = &ipdb;
 					rpd->ipv4_addr.peer_addr = attr->val.ipaddr;
 					rpd->ipv4_addr.addr = rpd->ses->ctrl->ppp ? conf_gw_ip_address : 0;
@@ -664,6 +674,9 @@ static void ses_finished(struct ap_session *ses)
 		}
 	}
 
+	if (rpd->acct_username)
+		_free(rpd->acct_username);
+
 	if (rpd->auth_reply)
 		rad_packet_free(rpd->auth_reply);
 
@@ -804,7 +817,8 @@ struct radius_pd_t *rad_find_session_pack(struct rad_packet_t *pack)
 				port_id = attr->val.string;
 				break;
 			case Framed_IP_Address:
-				ipaddr = attr->val.ipaddr;
+				if (attr->val.ipaddr != htonl(0xfffffffe))
+					ipaddr = attr->val.ipaddr;
 				break;
 			case Calling_Station_Id:
 				csid = attr->val.string;
@@ -958,8 +972,12 @@ static int load_config(void)
 		conf_require_nas_ident = atoi(opt);
 
 	opt = conf_get_opt("radius", "acct-interim-interval");
-	if (opt && atoi(opt) > 0)
+	if (opt && atoi(opt) >= 0)
 		conf_acct_interim_interval = atoi(opt);
+
+	opt = conf_get_opt("radius", "acct-interim-jitter");
+	if (opt && atoi(opt) >= 0)
+		conf_acct_interim_jitter = atoi(opt);
 
 	opt = conf_get_opt("radius", "acct-delay-time");
 	if (opt)

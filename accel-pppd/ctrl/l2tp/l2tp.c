@@ -94,6 +94,8 @@ static int conf_mppe = MPPE_UNSET;
 static int conf_dataseq = L2TP_DATASEQ_ALLOW;
 static int conf_reorder_timeout = 0;
 static const char *conf_ip_pool;
+static const char *conf_ipv6_pool;
+static const char *conf_dpv6_pool;
 static const char *conf_ifname;
 
 static unsigned int stat_conn_starting;
@@ -1791,11 +1793,22 @@ static int l2tp_session_start_data_channel(struct l2tp_sess_t *sess)
 	if (conf_ip_pool) {
 		sess->ppp.ses.ipv4_pool_name = _strdup(conf_ip_pool);
 		if (sess->ppp.ses.ipv4_pool_name == NULL) {
+		err_pool:
 			log_session(log_error, sess,
 				    "impossible to start data channel:"
-				    " allocation of IPv4 pool name failed\n");
+				    " allocation of pool name failed\n");
 			goto err;
 		}
+	}
+	if (conf_ipv6_pool) {
+		sess->ppp.ses.ipv6_pool_name = _strdup(conf_ipv6_pool);
+		if (sess->ppp.ses.ipv6_pool_name == NULL)
+			goto err_pool;
+	}
+	if (conf_dpv6_pool) {
+		sess->ppp.ses.dpv6_pool_name = _strdup(conf_dpv6_pool);
+		if (sess->ppp.ses.dpv6_pool_name == NULL)
+			goto err_pool;
 	}
 	if (conf_ifname)
 		sess->ppp.ses.ifname_rename = _strdup(conf_ifname);
@@ -1835,6 +1848,14 @@ err:
 	if (sess->ppp.ses.ipv4_pool_name) {
 		_free(sess->ppp.ses.ipv4_pool_name);
 		sess->ppp.ses.ipv4_pool_name = NULL;
+	}
+	if (sess->ppp.ses.ipv6_pool_name) {
+		_free(sess->ppp.ses.ipv6_pool_name);
+		sess->ppp.ses.ipv6_pool_name = NULL;
+	}
+	if (sess->ppp.ses.dpv6_pool_name) {
+		_free(sess->ppp.ses.dpv6_pool_name);
+		sess->ppp.ses.dpv6_pool_name = NULL;
 	}
 	if (sess->ctrl.called_station_id) {
 		_free(sess->ctrl.called_station_id);
@@ -2740,6 +2761,9 @@ static int l2tp_recv_SCCRQ(const struct l2tp_serv_t *serv,
 		return 0;
 	}
 
+	if (conf_max_starting && ap_session_stat.starting >= conf_max_starting)
+		return 0;
+
 	if (conf_max_sessions && ap_session_stat.active + ap_session_stat.starting >= conf_max_sessions)
 		return 0;
 
@@ -3279,6 +3303,9 @@ static int l2tp_recv_ICRQ(struct l2tp_conn_t *conn,
 		return 0;
 	}
 
+	if (conf_max_starting && ap_session_stat.starting >= conf_max_starting)
+		return 0;
+
 	if (conf_max_sessions && ap_session_stat.active + ap_session_stat.starting >= conf_max_sessions)
 		return 0;
 
@@ -3581,6 +3608,9 @@ static int l2tp_recv_OCRQ(struct l2tp_conn_t *conn,
 			   " discarding OCRQ\n");
 		return 0;
 	}
+
+	if (conf_max_starting && ap_session_stat.starting >= conf_max_starting)
+		return 0;
 
 	if (conf_max_sessions && ap_session_stat.active + ap_session_stat.starting >= conf_max_sessions)
 		return 0;
@@ -4938,6 +4968,8 @@ static void load_config(void)
 	}
 
 	conf_ip_pool = conf_get_opt("l2tp", "ip-pool");
+	conf_ipv6_pool = conf_get_opt("l2tp", "ipv6-pool");
+	conf_dpv6_pool = conf_get_opt("l2tp", "ipv6-pool-delegate");
 	conf_ifname = conf_get_opt("l2tp", "ifname");
 
 	switch (iprange_check_activation()) {

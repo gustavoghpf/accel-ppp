@@ -35,7 +35,7 @@ static struct {
 	uint64_t u64;
 } __packed serverid;
 
-static int conf_verbose;
+int conf_verbose;
 static int conf_pref_lifetime = 604800;
 static int conf_valid_lifetime = 2592000;
 static struct dhcpv6_opt_serverid *conf_serverid = &serverid.hdr;
@@ -188,7 +188,7 @@ static void insert_dp_routes(struct ap_session *ses, struct dhcpv6_pd *pd, struc
 		} else if (conf_verbose) {
 			inet_ntop(AF_INET6, &p->addr, str1, sizeof(str1));
 			if (addr)
-				inet_ntop(AF_INET6, &addr, str2, sizeof(str2));
+				inet_ntop(AF_INET6, addr, str2, sizeof(str2));
 			log_ppp_info2("dhcpv6: route add %s/%i%s%s\n", str1, p->prefix_len,
 					addr ? " via " : "", str2);
 		}
@@ -442,6 +442,8 @@ static void dhcpv6_send_reply(struct dhcpv6_packet *req, struct dhcpv6_pd *pd, i
 		dhcpv6_packet_print(reply, log_ppp_info2);
 	}
 
+	dhcpv6_fill_relay_info(reply);
+
 	net->sendto(pd->hnd.fd, reply->hdr, reply->endptr - (void *)reply->hdr, 0, (struct sockaddr *)&req->addr, sizeof(req->addr));
 
 	dhcpv6_packet_free(reply);
@@ -594,6 +596,8 @@ static void dhcpv6_send_reply2(struct dhcpv6_packet *req, struct dhcpv6_pd *pd, 
 		dhcpv6_packet_print(reply, log_ppp_info2);
 	}
 
+	dhcpv6_fill_relay_info(reply);
+
 	net->sendto(pd->hnd.fd, reply->hdr, reply->endptr - (void *)reply->hdr, 0, (struct sockaddr *)&req->addr, sizeof(req->addr));
 
 out:
@@ -738,6 +742,7 @@ static void dhcpv6_recv_decline(struct dhcpv6_packet *pkt)
 {
 	// don't answer
 }
+
 
 static void dhcpv6_recv_packet(struct dhcpv6_packet *pkt)
 {

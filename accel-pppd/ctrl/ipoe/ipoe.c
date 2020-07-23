@@ -107,6 +107,7 @@ struct local_net {
 
 enum {SID_MAC, SID_IP};
 
+static int conf_check_exists;
 static int conf_dhcpv4 = 1;
 static int conf_up;
 static int conf_auto;
@@ -118,6 +119,8 @@ static int conf_arp;
 static int conf_ipv6;
 static uint32_t conf_src;
 static const char *conf_ip_pool;
+static const char *conf_ipv6_pool;
+static const char *conf_dpv6_pool;
 static const char *conf_l4_redirect_pool;
 //static int conf_dhcpv6;
 static int conf_username;
@@ -577,6 +580,24 @@ static int ipoe_create_interface(struct ipoe_session *ses)
 	return 0;
 }
 
+static int check_exists(struct ipoe_session *self_ipoe, in_addr_t addr)
+{
+	struct ap_session *ses;
+	int r = 0;
+
+	pthread_rwlock_rdlock(&ses_lock);
+	list_for_each_entry(ses, &ses_list, entry) {
+		if (!ses->terminating && ses->ipv4 && ses->ipv4->peer_addr == addr && ses != &self_ipoe->ses) {
+			log_ppp_warn("ipoe: IPv4 address already assigned to %s\n", ses->ifname);
+			r = 1;
+			break;
+		}
+	}
+	pthread_rwlock_unlock(&ses_lock);
+
+	return r;
+}
+
 static void auth_result(struct ipoe_session *ses, int r)
 {
 	char *username = ses->username;
@@ -616,6 +637,11 @@ static void auth_result(struct ipoe_session *ses, int r)
 
 	ap_session_set_username(&ses->ses, username);
 	log_ppp_info1("%s: authentication succeeded\n", ses->ses.username);
+
+	if (conf_check_exists && check_exists(ses, ses->yiaddr)){
+		ap_session_terminate(&ses->ses, TERM_NAS_REQUEST, 1);
+		return;
+	}
 
 cont:
 	triton_event_fire(EV_SES_AUTHORIZED, &ses->ses);
@@ -1276,6 +1302,9 @@ static struct ipoe_session *ipoe_session_create_dhcpv4(struct ipoe_serv *serv, s
 	if (ap_shutdown)
 		return NULL;
 
+	if (conf_max_starting && ap_session_stat.starting >= conf_max_starting)
+		return NULL;
+
 	if (conf_max_sessions && ap_session_stat.active + ap_session_stat.starting >= conf_max_sessions)
 		return NULL;
 
@@ -1341,6 +1370,10 @@ static struct ipoe_session *ipoe_session_create_dhcpv4(struct ipoe_serv *serv, s
 
 	if (conf_ip_pool)
 		ses->ses.ipv4_pool_name = _strdup(conf_ip_pool);
+	if (conf_ipv6_pool)
+		ses->ses.ipv6_pool_name = _strdup(conf_ipv6_pool);
+	if (conf_dpv6_pool)
+		ses->ses.dpv6_pool_name = _strdup(conf_dpv6_pool);
 
 	triton_context_register(&ses->ctx, &ses->ses);
 
@@ -1769,6 +1802,8 @@ static void __ipoe_recv_dhcpv4(struct dhcpv4_serv *dhcpv4, struct dhcpv4_packet 
 			}
 
 			ses = ipoe_session_create_dhcpv4(serv, pack);
+			if (!ses)
+				goto out;
 
 			ses->weight = weight = serv->opt_weight >= 0 ? serv->sess_cnt * serv->opt_weight : (stat_active + 1) * conf_weight;
 		}	else {
@@ -1993,10 +2028,13 @@ static struct ipoe_session *ipoe_session_create_up(struct ipoe_serv *serv, struc
 	if (ap_shutdown)
 		return NULL;
 
-	if (connlimit_loaded && connlimit_check(cl_key_from_ipv4(saddr)))
+	if (conf_max_starting && ap_session_stat.starting >= conf_max_starting)
 		return NULL;
 
 	if (conf_max_sessions && ap_session_stat.active + ap_session_stat.starting >= conf_max_sessions)
+		return NULL;
+
+	if (connlimit_loaded && connlimit_check(cl_key_from_ipv4(saddr)))
 		return NULL;
 
 	if (l4_redirect_list_check(saddr))
@@ -2040,6 +2078,10 @@ static struct ipoe_session *ipoe_session_create_up(struct ipoe_serv *serv, struc
 
 	if (conf_ip_pool)
 		ses->ses.ipv4_pool_name = _strdup(conf_ip_pool);
+	if (conf_ipv6_pool)
+		ses->ses.ipv6_pool_name = _strdup(conf_ipv6_pool);
+	if (conf_dpv6_pool)
+		ses->ses.dpv6_pool_name = _strdup(conf_dpv6_pool);
 
 	ses->ctrl.dont_ifcfg = 1;
 
@@ -2085,6 +2127,10 @@ static void ipoe_session_create_auto(struct ipoe_serv *serv)
 
 	if (conf_ip_pool)
 		ses->ses.ipv4_pool_name = _strdup(conf_ip_pool);
+	if (conf_ipv6_pool)
+		ses->ses.ipv6_pool_name = _strdup(conf_ipv6_pool);
+	if (conf_dpv6_pool)
+		ses->ses.dpv6_pool_name = _strdup(conf_dpv6_pool);
 
 	ses->ctrl.dont_ifcfg = 1;
 
@@ -3877,6 +3923,8 @@ static void load_config(void)
 		conf_offer_timeout = 10;
 
 	conf_ip_pool = conf_get_opt("ipoe", "ip-pool");
+	conf_ipv6_pool = conf_get_opt("ipoe", "ipv6-pool");
+	conf_dpv6_pool = conf_get_opt("ipoe", "ipv6-pool-delegate");
 	conf_l4_redirect_pool = conf_get_opt("ipoe", "l4-redirect-ip-pool");
 
 	conf_vlan_name = conf_get_opt("ipoe", "vlan-name");
@@ -3929,6 +3977,12 @@ static void load_config(void)
 		conf_weight = atoi(opt);
 	else
 		conf_weight = 0;
+
+	opt = conf_get_opt("ipoe", "check-ip");
+	if (!opt)
+		opt = conf_get_opt("common", "check-ip");
+	if (opt && opt >= 0)
+		conf_check_exists = atoi(opt) > 0;
 
 #ifdef RADIUS
 	if (triton_module_loaded("radius"))
